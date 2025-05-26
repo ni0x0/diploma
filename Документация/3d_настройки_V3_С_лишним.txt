@@ -1,0 +1,141 @@
+С лишним
+
+1. Предобработка 
+
+Фильтрация выбросов
+
+Параметр	Тип/Диапазон	По умолчанию	Описание
+----outlier_removal_method	"statistical" | "radius"	"statistical"	Метод фильтрации
+outlier_removal.neighbors	20-100	40	Только для statistical: число соседей
+outlier_removal.std_ratio	0.5-2.0	1.0	Только для statistical: агрессивность
+----outlier_removal.radius_search	0.01-0.1 м	0.05	Только для radius: радиус поиска
+----outlier_removal.min_neighbors	5-20	10	Только для radius: мин. соседей
+distance_filter.enabled	bool	True	Фильтр по дальности
+distance_filter.max	0.1-50.0 м	10.0	Макс. дальность
+distance_filter.min	0.01-1.0 м	0.1	Мин. дальность
+
+Для RGBD лучше statistical (шум точечный), radius актуально для LiDAR, для RGBD редко
+
+Даунсэмплинг
+
+Параметр	Тип/Диапазон	По умолчанию	Логика
+downsampling.mode	"fixed" | "adaptive"	"adaptive"	Режим
+downsampling.voxel_size	0.001-0.01 м	0.002	Только для fixed
+downsampling.min_points	3-10	5	Только для adaptive
+downsampling.target_points	10K-1M	100K	Альтернатива для adaptive
+
+Нормали
+
+Параметр	Тип/Диапазон	По умолчанию	Применение
+normals.estimate	bool	True	Включить расчет
+----normals.method	"radius" | "knn"	"radius"	Метод расчета
+normals.radius	1.0-5.0×voxel_size	2.0	Для radius-метода
+----normals.max_neighbors	10-200	50	Для knn-метода
+----normals.orientation	"consistent" | "camera" (а зачем)	"consistent"	Выравнивание
+
+radius (стабильнее для RGBD)
+
+
+2. Глобальная регистрация
+
+Основные
+
+Параметр	Тип/Диапазон	По умолчанию	Важность
+global_registration.enabled	bool	True	Включение этапа
+global_registration.method	"ransac" | "fgr" | ("hybrid" а зачем)	"hybrid"	Алгоритм
+----global_registration.initial_alignment	"none" | "pca" | "manual"	"none"	Предварительное выравнивание
+----global_registration.manual_transform	4×4 матрица	None
+
+RANSAC
+
+Параметр	Диапазон	По умолчанию
+ransac.max_iterations	10K-5M	1M
+ransac.confidence	0.9-0.999	0.999
+ransac.correspondence_randomness	5-20	10
+----ransac.similarity_threshold	0.1–0.5	0.3	Порог схожести
+
+similarity_threshold только для сложных сцен
+
+FGR
+
+Параметр	Диапазон	По умолчанию
+fgr.division_factor	1.2-2.0	1.4
+fgr.max_iterations	30-200	64
+----fgr.tuple_scale	0.1–1.0	0.95	Влияние кортежей
+
+tuple_scale оставить по умолчанию
+
+Общие
+
+Параметр	Диапазон	По умолчанию
+feature_radius	3.0-8.0×voxel_size	5.0
+correspondence_checks.edge_length	bool	True
+correspondence_checks.distance	bool	True
+correspondence_checks.normal	bool	True
+
+3. Локальная ICP-регистрация
+
+Основные
+
+Параметр	Тип	По умолчанию
+icp.method	"point_to_point" | "point_to_plane" 
+colored_icp	Использование цвета
+
+Уровни ICP
+
+Уровень	Множитель	Абсолютное значение	Итерации
+Coarse	3.0-6.0×	0.005-0.05 м	30-100
+Fine	1.0-3.0×	0.001-0.01 м	20-50
+
+множители/вручную
+Coarse	3.0-6.0 (по умолчанию: 4.0)	Широкий поиск     # Поля для абсолютных значений (метры)
+coarse_threshold_absolute = 0.01  # (0.005-0.05)
+fine_threshold_absolute = 0.003   # (0.001-0.01)
+
+Colored ICP
+Параметр	Диапазон	По умолчанию
+colored_icp.geometric_weight	0.5-1.0	0.9
+colored_icp.photometric_weight	0.0-0.5	0.1
+
+
+4. Постобработка
+
+Общие
+
+Параметр	Тип/Диапазон	По умолчанию
+postprocessing.final_voxel_size	0.5-2.0×voxel_size	1.0×
+postprocessing.fill_holes	bool	False	Заполнение дыр
+postprocessing.hole_size	0.01–0.1 м	0.05	Макс. размер дыр
+
+Фильтрация
+
+Параметр	Диапазон	По умолчанию
+artifact_removal.min_cluster	50-500	100
+artifact_removal.tolerance	0.01-0.05 м	0.02
+artifact_removal.keep_largest	bool	True
+
+Сглаживание
+
+Параметр	Тип	По умолчанию
+smoothing.method	"none" | "mls" | "laplacian"	"none"
+smoothing.mls_radius	0.01-0.05 м	0.03
+smoothing.iterations	1-5	3
+artifact_removal.edge_preserve	bool	True	Сохранять границы
+smoothing.taubin_lambda	0.1–0.5	0.3	Параметр Taubin (λ)
+smoothing.taubin_mu	-0.5–0.0	-0.3	Параметр Taubin (μ)
+
+
+5. Оптимизация
+
+Параметр	Тип/Диапазон	По умолчанию	Описание
+optimization.enabled	bool	True	Включить оптимизацию
+optimization.algorithm	"L-M" | "Gauss-Newton" | "Levenberg"	"L-M"	Алгоритм
+loop_closure.enabled	bool	True	Петлевые замыкания
+loop_closure.min_points	100–1000	500	Мин. точек для замыкания
+Добавлено:
+optimization.edge_prune_threshold	0.1–0.5	0.25	Порог обрезки ребер
+optimization.use_geodesic	bool	False	Геодезические расстояния
+
+
+
+

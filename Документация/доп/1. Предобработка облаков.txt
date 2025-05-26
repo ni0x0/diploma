@@ -1,0 +1,117 @@
+1. Предобработка облаков
+
+Фильтрация выбросов (обязательно)
+Параметр	Диапазон	По умолчанию	Описание
+outlier_removal_method: str = "statistical"  # "statistical"|"radius"
+outlier_removal_neighbors	20-100	40	Количество соседей для статистического анализа
+outlier_removal_std_ratio	0.5-2.0	1.0	Порог отклонения (чем меньше, тем агрессивнее фильтрация)
+max_distance: float = 10.0         # Отсечка по дальности (м)
+min_distance: float = 0.1          # Отсечка ближних точек (м)
+
+Даунсэмплинг (обязательно)
+Параметр	Диапазон (м)	По умолчанию	Примечание
+voxel_size	0.001-0.01	0.002	Базовый размер вокселя. Влияет на все этапы!
+adaptive_downsampling: bool = True  # Автоподбор voxel_size на основе плотности точек
+min_points_per_voxel: int = 5      # Минимальное число точек в вокселе
+
+Расчет нормалей (опционально, но рекомендуется)
+Параметр	Диапазон	По умолчанию	Где используется
+normal_orientation_method: str = "consistent"  # "consistent"|"camera"|"oriented"
+normal_estimation_radius	1.0-5.0 × voxel_size	2.0	FPFH, ICP point-to-plane
+normal_max_neighbors	10-200	50	Альтернатива радиусу (если выбран KNN)
+orient_normals (галочка)	bool	True	Согласование направлений нормалей
+
+2. Глобальная регистрация
+
+Основные параметры
+Параметр	Диапазон	По умолчанию	Критичность
+"point_to_point" или "point_to_plane"
+Многоуровневый подход: VOXEL_SIZE * 3, VOXEL_SIZE * 2, VOXEL_SIZE
+feature_radius_multiplier	3.0-8.0 × voxel_size	5.0	Высокая (влияет на FPFH)
+ransac_iterations	10K-5M	1M	Средняя (больше = точнее, но медленнее)
+ransac_confidence	0.9-0.999	0.999	Низкая (можно оставить по умолчанию)
+Проверки соответствий (галочки)
+edge_length_check (по умолчанию: True)
+
+distance_check (обязательно: True)
+
+normal_angle_check (если есть нормали: True)
+
+correspondence_checks: dict = {
+    "edge_length": {"enabled": True, "min_ratio": 0.9},
+    "distance": {"enabled": True, "threshold": 0.1},
+    "normal": {"enabled": True, "angle_threshold": 15}  # градусы
+}
+
+fgr_options: dict = {
+    "division_factor": 1.4,
+    "iteration_number": 64,
+    "maximum_correspondence_distance": 0.025
+}
+
+3. Локальная ICP-регистрация
+
+Общие настройки
+Параметр	Диапазон	По умолчанию	Примечание
+icp_method	point_to_point, point_to_plane, colored	point_to_plane	Требует нормалей
+max_iterations	30-200	100	На каждый уровень
+Двухуровневая настройка
+Уровень	Множитель порога (× voxel_size)	Описание
+множители/вручную
+Coarse	3.0-6.0 (по умолчанию: 4.0)	Широкий поиск     # Поля для абсолютных значений (метры)
+coarse_threshold_absolute = 0.01  # (0.005-0.05)
+fine_threshold_absolute = 0.003   # (0.001-0.01)
+Fine	1.0-3.0 (по умолчанию: 1.5)	Точная подгонка
+Критерии остановки
+Параметр	Диапазон	По умолчанию
+relative_fitness	1e-6 – 1e-4	1e-6
+relative_rmse	1e-6 – 1e-4	1e-6
+
+colored_icp_weights: dict = {
+    "geometric": 0.9,
+    "photometric": 0.1
+}
+
+4. Постобработка
+
+Параметр	Диапазон	По умолчанию	Описание
+final_voxel_size	= voxel_size или 0.5-2 × voxel_size	1.0 × voxel_size	Удаление дубликатов
+smooth_normals (галочка)	bool	False	Сглаживание нормалей MLS
+save_intermediate	bool	False	Для отладки
+
+Удаление артефактов:
+
+python
+artifact_removal: dict = {
+    "min_cluster_size": 100,    # Минимальный размер кластера
+    "cluster_tolerance": 0.02,  # Макс. расстояние между точками (м)
+    "keep_largest_only": True   # Оставить только основной кластер
+}
+
+Сглаживание поверхности:
+
+python
+surface_smoothing: dict = {
+    "method": "MLS",  # "MLS"|"Laplacian"
+    "mls_radius": 0.03,
+    "smooth_iterations": 3
+}
+
+
+global_optimization: dict = {
+    "enabled": True,
+    "algorithm": "L-M",  # "L-M" (Levenberg-Marquardt) | "Gauss-Newton"
+    "max_iterations": 100,
+    "edge_prune_threshold": 0.25,
+    "robust_kernel": "Huber"  # "Huber"|"Cauchy"|None
+}
+
+loop_closure: dict = {
+    "enabled": True,
+    "min_loop_points": 500,
+    "fitness_threshold": 0.3,
+    "verification": {
+        "method": "geometric_consistency",
+        "correspondences": 30
+    }
+}
